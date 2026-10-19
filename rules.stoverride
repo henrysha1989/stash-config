@@ -8,14 +8,15 @@
 #   · rules: #!replace          → 机场自带的规则全部丢弃
 #   · proxy-groups: #!replace   → 机场自带的策略组全部丢弃（Netflix / Disney+ / YouTube 之类）
 #     两组都用 include-all 收机场的 proxies / proxy-providers，节点本身不受影响。
-#   代价：机场模板里那些按服务预分的组（流媒体解锁分组等）会一起消失；
-#         要保留就复制它们的定义进来，或去掉 proxy-groups 的 #!replace。
 #
-#  ⚠️ 组名带 `ST-` 前缀：机场模板常用「节点选择 / 手动选择 / 自动选择 / 国内直连」。
-#     即便做了 replace，也建议保留前缀，方便一眼区分是谁的组。
+#  ⚠️ 组名带 ST- 前缀：机场模板常用「节点选择 / 手动选择 / 自动选择 / 国内直连」，
+#     撞名会直接报 stash core config parse failed: duplicate proxy name。
+#
+#  2026-10-20 修订：广告表前加 DOMAIN-SUFFIX,api.immomo.com 豁免 ——
+#  lite 表把陌陌主 API 当广告域收掉，不豁免会持续「网络异常」。
 # ==============================================================================
 name: 规则与自建表
-desc: 分流规则 + 广告/直连自建表 + 4 个策略组，替换机场自带的规则与分组
+desc: 分流规则 + 广告/直连自建表 + 4 个策略组（已豁免陌陌主 API）
 
 # ------------------------------------------------------------------------------
 # 4. 策略组（只在「ST-手动选择 / ST-自动选择」上用 include-all）
@@ -147,6 +148,10 @@ rules: #!replace
   # ⚠️ 必须排在 GEOSITE,CN / GEOIP,CN 之前，否则 CN 广告域会被国内兜底放走；
   #    同时又排在 DirectCustom 之后，避免误拦自家域 / 公司系统。
   # 动作用 REJECT：要静默丢包可改成 REJECT-DROP（Stash 支持这两个内置策略）。
+  # 误拦豁免（必须在广告表之前）：lite 表把陌陌主 API 当广告域收了
+  # （+.api.immomo.com），不豁免陌陌会持续「网络异常」。2026-10-19 日志实证、
+  # 2026-10-20 复现。只放行主 API；广告域 adip-api / ad-screen-api 仍被拦。
+  - DOMAIN-SUFFIX,api.immomo.com,ST-国内直连
   - RULE-SET,AdBlockMihomoLite,REJECT
   - RULE-SET,ByteDanceAd,REJECT
   - RULE-SET,SoulAd,REJECT
