@@ -13,6 +13,7 @@ iOS / iPadOS / macOS 端 **Stash**（[stash.wiki](https://stash.wiki/)）的分�
 | 文件 | 说明 |
 |---|---|
 | `config.yaml` | 主配置：DNS（fake-ip + follow-rule）+ 4 个策略组 + 42 条分流规则 + 7 个远程规则集 |
+| `dns.stoverride` | 只改 DNS 的覆写文件，叠加在**任意**配置上（不碰规则、策略组、节点） |
 
 ## 导入
 
@@ -74,6 +75,11 @@ Stash 自己就是 DNS 解析器（没有 `tun` / `dns.listen` 这些键，隧�
 curl 'http://<stash-ip>:<port>/dns/record'      # 看某条查询由哪个 server 回答、耗时多少
 curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS 服务器
 ```
+
+**不想换配置、只想改 DNS**：用仓库里的 `dns.stoverride` ——
+设置 → 覆写 → 新建本地覆写 → 贴入内容 → 启用。它只覆盖 `dns:` 段，原配置的规则、策略组、
+节点一概不动。注意 `nameserver` 带 `#!replace`（否则覆写数组只会插到原数组前面，旧服务器还在），
+而 `nameserver-policy` 是字典按键合并，你原有的其它 policy 条目会保留。
 
 ## 与 clash-for-ios-config 的差异
 
