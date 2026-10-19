@@ -83,7 +83,8 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
 而 `nameserver-policy` 是字典按键合并，你原有的其它 policy 条目会保留。
 
 **只想换规则**：用 `rules.stoverride`。它带上 4 个策略组（`include-all` 直接收机场的节点）和 7 个规则集，
-`rules` 用 `#!replace` 整体替换机场规则。
+`rules` 与 `proxy-groups` 都带 `#!replace` —— 机场自带的规则**和**策略组（Netflix / Disney+ / YouTube 那些分组）
+会被整段替换掉，界面里只留这套 `ST-*` 组。想保留机场某些分组，就把它们的定义抄进来，或去掉 `proxy-groups` 的 `#!replace`。
 
 策略组名统一带 `ST-` 前缀（`ST-节点选择` / `ST-手动选择` / `ST-自动选择` / `ST-国内直连`）。
 原因：机场模板常用「节点选择 / 手动选择 / 自动选择 / 国内直连」，撞名会直接报
