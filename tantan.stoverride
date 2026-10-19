@@ -1,33 +1,52 @@
 # ==============================================================================
 #  探探去广告（路径级 / MitM）
 # ------------------------------------------------------------------------------
-#  抓包依据（2026-10-19，core.tantanapp.com 实测出现过的广告路径）：
-#    /v2/ad/configuration         开屏策略（coldStart / hotStart 竞价）
-#    /v2/ad-data                  广告数据
-#    /v2/ad/material/*            素材清单（userRecord / guideInfo …）
-#    /v2/ad/aaid                  广告标识
-#    /v2/monetization/strategy/configuration
-#    /v2/monetization-promotions
-#    /v2/users/{id}/advert/tantan-advert/query
+#  2026-10-20 抓包（ProxyPin，冷启动，core.tantanapp.com）确认的开屏链路：
+#    POST /v2/ad/configuration      435 B  ← 开屏策略：GDT 竞价（两个 placementId）
+#    POST /v2/ad/aaid               162 B
+#    GET  /v2/ad-data               2 B（空）
+#    GET  /v2/ad/material/*         素材清单
+#    GET  /v2/oms/me/creatives      187 B  ← 广告创意清单
+#    GET  /v2/monetization/strategy/configuration
+#    GET  /v2/monetization-promotions
+#    GET  /v2/users/{id}/advert/tantan-advert/query
 #
-#  ⚠️ 效果预期：**可能仍会弹**
-#   ProxyPin 的 POC 结论是：拦掉这些路径后开屏广告仍在 —— 策略与素材在本地有缓存，
-#   而且 GDT / 穿山甲等第三方 SDK 会立刻补位（那些域名我们的规则集已经拦了）。
-#   想验证的话：装完这个覆写 → 冷启动一次 → 若仍弹，卸载重装探探清缓存再看。
+#  策略分两种，别再混用：
+#   · /v2/ad/configuration → 用 script 返回「没有广告位」的**合法结构**（见 scripts/tantan-ad-config.js）
+#     直接 reject-dict 回 "{}" 会让 App 可能回退到内置默认配置，反而不稳。
+#   · 其余路径 → reject-dict（回空 JSON，App 不崩）
 #
-#  ⚠️ 同样有三条代价：MitM 解密主 API 的全部流量、pinning 会直接连不上、路径写错坏主功能。
+#  ⚠️ 已知风险
+#   · MitM 解密 core.tantanapp.com 的全部流量（主 API）；pinning 会导致连不上
+#   · GDT / 穿山甲 / tanx 等第三方 SDK 域名由规则集在域名层拦，不在这里重复
+#   · 若开屏仍出现，先确认是不是 **feed 推广卡片**（/v2/users 响应里混排，规则无解）
 # ==============================================================================
 name: 探探去广告（路径级）
-desc: MitM core.tantanapp.com，按路径拦开屏/广告位接口（受本地缓存影响，可能无效）
+desc: MitM core.tantanapp.com：开屏策略改写为空广告位，其余广告接口回空 JSON
 
 http:
   mitm:
     - core.tantanapp.com
 
   url-rewrite:
-    # /v2/ad、/v2/ad-data、/v2/ad/material/*、/v2/ad/aaid …
-    # 加 ([/-]|$) 是必须的：否则 /v2/address 之类的路径也会被误伤
-    - ^https?://core\.tantanapp\.com/v2/ad([/-]|$) - reject-dict
+    # 广告数据 / 素材清单 / 设备广告标识（不含 configuration，那条走 script）
+    - ^https?://core\.tantanapp\.com/v2/ad-data - reject-dict
+    - ^https?://core\.tantanapp\.com/v2/ad/aaid - reject-dict
+    - ^https?://core\.tantanapp\.com/v2/ad/material/ - reject-dict
+    # 广告创意清单（2026-10-20 新增）
+    - ^https?://core\.tantanapp\.com/v2/oms/me/creatives - reject-dict
+    # 推广位与变现策略
     - ^https?://core\.tantanapp\.com/v2/monetization-promotions - reject-dict
     - ^https?://core\.tantanapp\.com/v2/monetization/strategy/configuration - reject-dict
     - ^https?://core\.tantanapp\.com/v2/users/[^/]+/advert/ - reject-dict
+
+  script:
+    # 开屏策略：原样结构 + 清空 placementId（脚本内容见 scripts/tantan-ad-config.js）
+    - match: ^https?://core\.tantanapp\.com/v2/ad/configuration$
+      name: tantan-ad-config
+      type: response
+
+script-providers:
+  tantan-ad-config:
+    url: https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/tantan-ad-config.js
+    interval: 86400
