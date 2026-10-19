@@ -33,6 +33,8 @@ http:
     - ^https?://core\.tantanapp\.com/v2/ad-data - reject-dict
     - ^https?://core\.tantanapp\.com/v2/ad/aaid - reject-dict
     - ^https?://core\.tantanapp\.com/v2/ad/material/ - reject-dict
+    # 启动页 / 开屏广告（2026-10-20 03:15 加，未拿到 body schema，先按最保守方式试）
+    - ^https?://core\.tantanapp\.com/v2/oms/user/launchPages - reject-dict
     # 广告创意清单（2026-10-20 新增）
     - ^https?://core\.tantanapp\.com/v2/oms/me/creatives - reject-dict
     # 推广位与变现策略
