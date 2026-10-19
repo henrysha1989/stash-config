@@ -1,0 +1,31 @@
+# ==============================================================================
+#  陌陌去广告（路径级 / MitM）
+# ------------------------------------------------------------------------------
+#  为什么要 MitM：陌陌的广告决策接口挂**主 API** api.immomo.com 上，
+#  域名级拦截会把主功能一起打断（lite 表曾误收 +.api.immomo.com，陌陌持续「网络异常」）。
+#  所以只能按路径拦。
+#
+#  ⚠️ 三条代价，装之前想清楚
+#   1) MitM 会解密 api.immomo.com 的**全部**流量（私聊、位置、关系链都在这个域上）。
+#      虽然数据只在设备本地处理，但这是隐私面上的真实成本。
+#   2) App 若对证书做 pinning，表现是「连不上」而不是「没效果」。
+#   3) 路径写错会直接坏主功能；`reject-dict` 回空 JSON 比 `reject` 断连温和，但也可能让 App 报错。
+#
+#  依据：2026-10-19 ProxyPin 抓包 + POC（拦 /api/banners*、/v2/adver/* 后开屏消失）
+#  预期：开屏广告减少；信息流广告不在此列。
+# ==============================================================================
+name: 陌陌去广告（路径级）
+desc: MitM api.immomo.com，按路径拦开屏与横幅接口（回空 JSON）
+
+http:
+  mitm:
+    - api.immomo.com
+    - api-vip.immomo.com
+
+  url-rewrite:
+    # 开屏 / 欢迎页横幅
+    - ^https?://api\.immomo\.com/api/banners - reject-dict
+    # 广告位下发（screen/index 等）
+    - ^https?://api\.immomo\.com/v2/adver/ - reject-dict
+    # 会员页广告展示
+    - ^https?://api-vip\.immomo\.com/ad/ - reject-dict
