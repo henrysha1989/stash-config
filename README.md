@@ -63,7 +63,7 @@ Stash 自己就是 DNS 解析器（没有 `tun` / `dns.listen` 这些键，隧�
 
 - **`follow-rule` 是这个仓库与 mihomo 版最关键的差异**。Stash 默认让 DNS 查询直接出站，
   不写它，`1.1.1.1` 的查询就从本地运营商线路裸奔出去（虽仍是加密 DoH，但解析器看到的是你的真实 IP，
-  且国内网络下还可能被拒）。开启后这些查询命中 `MATCH → 节点选择`，经代理出去。
+  且国内网络下还可能被拒）。开启后这些查询命中 `MATCH → ST-节点选择`，经代理出去。
 - 开启前提（Stash 文档）：DNS 服务器写成 IP、或代理地址是 IP、或配了 `proxy-server-nameserver`。
   本配置三条都满足，所以不会产生递归查询。
 - 代价：境外域名的解析依赖节点可用；文档也提示可能影响 CDN 就近调度。国内/苹果域名已被 policy 摘出去。
@@ -83,8 +83,11 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
 而 `nameserver-policy` 是字典按键合并，你原有的其它 policy 条目会保留。
 
 **只想换规则**：用 `rules.stoverride`。它带上 4 个策略组（`include-all` 直接收机场的节点）和 7 个规则集，
-`rules` 用 `#!replace` 整体替换机场规则。启用前确认机场配置里没有同名策略组
-（节点选择 / 手动选择 / 自动选择 / 国内直连），有的话把组名和规则里的引用一起改名。
+`rules` 用 `#!replace` 整体替换机场规则。
+
+策略组名统一带 `ST-` 前缀（`ST-节点选择` / `ST-手动选择` / `ST-自动选择` / `ST-国内直连`）。
+原因：机场模板常用「节点选择 / 手动选择 / 自动选择 / 国内直连」，撞名会直接报
+`stash core config parse failed: duplicate proxy name: 手动选择`。要换前缀就同时改组定义和 rules 里的引用。
 
 ## 与 clash-for-ios-config 的差异
 
@@ -104,7 +107,7 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
 
 1. HttpDNS 拦截 → 2. WebRTC 截断（按域名）→ 3. 内网/本机/自建 → 4. 国内专项（苹果/钉钉/公司系统）
 → 5. 广告拦截 → 6. 国内娱乐分类 → 7. 泄漏测试工具 → 7b. QUIC 强切 TCP
-→ 8. 海外专项 → 9. 国内兜底 → 10. `MATCH,节点选择`
+→ 8. 海外专项 → 9. 国内兜底 → 10. `MATCH,ST-节点选择`
 
 两个容易踩的点，已经在注释里写死：
 
