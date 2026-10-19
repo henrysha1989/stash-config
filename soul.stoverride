@@ -1,0 +1,27 @@
+# ==============================================================================
+#  Soul 去广告（路径级 / MitM）—— ⚠️ 与现有域名拦截重复，多数情况下不需要装
+# ------------------------------------------------------------------------------
+#  为什么说冗余：
+#    Soul 的广告域（ssp.soulapp.cn / soul-ad.soulapp.cn / ad*.soulapp.cn …）
+#    已经整域收在自建表 `soul-ad.list` 里，由 `rules.stoverride` 的 `SoulAd` 规则集拦掉。
+#    整域 REJECT 与「按路径拦」的结果等价，而且更彻底。
+#
+#  什么时候才有用：
+#    · 你没用 `rules.stoverride`（没装 SoulAd 那张表）；
+#    · 或者将来 Soul 把广告接口迁到主域（post.soulapp.cn / api-a.soulapp.cn）上 —— 那时才必须按路径拦。
+#
+#  抓包依据（2026-10-19）：ssp.soulapp.cn 上的广告路径有
+#    /api/ad/strategyApi 、/api/ad/clientConfig 、/api/q 、/api/bidResult
+#    （POC 拦掉前两个后，App 立刻转投 /api/q + /api/bidResult 竞价 —— 所以整域拦才是对的）
+#
+#  ⚠️ MitM 代价：解密 ssp.soulapp.cn 全部流量；pinning 会导致连接失败。
+# ==============================================================================
+name: Soul 去广告（路径级，通常冗余）
+desc: MitM ssp.soulapp.cn 按路径拦；若已启用 SoulAd 规则集（整域拦）则无需安装
+
+http:
+  mitm:
+    - ssp.soulapp.cn
+
+  url-rewrite:
+    - ^https?://ssp\.soulapp\.cn/api/(ad/|q$|bidResult) - reject-dict
