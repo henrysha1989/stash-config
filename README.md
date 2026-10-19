@@ -98,7 +98,7 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
 | 文件 | 目标 App | MitM 域名 | 预期 |
 |---|---|---|---|
 | `momo.stoverride` | 陌陌 | `api.immomo.com` `api-vip.immomo.com` | 开屏/横幅减少（信息流广告不在此列） |
-| `tantan.stoverride` | 探探 | `core.tantanapp.com` | **可能无效**：策略与素材本地有缓存，第三方 SDK 会补位 |
+| `tantan.stoverride` | 探探 | `core.tantanapp.com` | **实测无效**，见下「已试验但无解」 |
 | `soul.stoverride` | Soul | `ssp.soulapp.cn` | **通常冗余**：`SoulAd` 表已整域拦掉 |
 
 ### 为什么没有并进域名表
@@ -107,6 +107,27 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
   （lite 表曾把 `+.api.immomo.com` 当广告域收掉，陌陌持续「网络异常」，2026-10-19 已回滚）。
 - **Soul**：`ssp.soulapp.cn` / `soul-ad.soulapp.cn` 等已在 `soul-ad.list` 里整域拦，
   路径级没有增量 —— 装了 `rules.stoverride` 就不用装 `soul.stoverride`。
+
+### 已试验但无解（2026-10-20，真机四轮验证）
+
+**探探：** 开屏广告是「天猫双11」这类阿里妈妈创意，由**陌陌广告平台**下发
+（请求头 `x-viewed-launchpages-last-day: momo_cpt_kp2026101216290543107`）。四层都试过：
+
+| 手段 | 结果 |
+|---|---|
+| 域名拦截（GDT / 穿山甲 / tanx / 探探广告域） | ❌ 日志 1,257 条 REJECT，广告仍在 |
+| `reject-dict` 拦 `/v2/ad/*` | ❌ 响应 2 B，广告仍在 |
+| script 改写 `/v2/ad/configuration` | ❌ 脚本执行成功（435 → 399 B，placementId 清空），广告仍在 |
+| `reject-dict` 拦 `/v2/oms/user/launchPages` | ❌ 客户端明确在请求 `x-accept-creative-types`，返回 `{}` 后广告仍在 |
+
+⇒ 创意走 amdc（硬编码 IP，无 SNI）或已预缓存到客户端，域名 / 路径 / MitM 三层都够不到。
+`tantan.stoverride` **建议保持禁用** —— 它要在主 API 上开 MitM，隐私成本大于零收益。
+
+**闲鱼：** 阿里的 amdc 广告分发走硬编码 IP
+（`POST 59.82.113.219/amdc/mobileDispatch?appkey=12431167`），无 SNI、无路径语义；
+封 `59.82.0.0/16` 会废掉淘宝 / 闲鱼 / 支付宝，**不做**。
+
+**结论：** 这类「第一方 + 硬编码 IP」的广告，客户端规则层面拿不到。域名层能拦的（GDT / 穿山甲 / tanx 埋点）继续拦即可。
 
 ### 使用前提
 
