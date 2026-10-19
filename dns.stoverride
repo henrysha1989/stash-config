@@ -1,0 +1,50 @@
+# ==============================================================================
+#  DNS 覆写 —— 只改 DNS，不动规则 / 策略组 / 节点
+# ------------------------------------------------------------------------------
+#  用法
+#   1) Stash → 设置 → 覆写 → 新建本地覆写 → 把本文件内容整段贴进去 → 保存 → 启用；
+#   2) 或者把文件放进 iCloud/「文件」，长按用 Stash 打开导入。
+#  生效方式：叠加在当前启用的配置上，按「同名键覆盖」合并。
+#  原配置的 rules / proxy-groups / proxies / rule-providers 完全不受影响。
+#
+#  ⚠️ 前提与代价
+#   · follow-rule 会把 DNS 查询交给代理规则转发，代价是境外解析依赖节点可用，
+#     且可能影响 CDN 就近调度（Stash 文档原话：仅在必要时开启）。
+#   · nameserver 必须带 #!replace，否则覆写数组只会插到原数组前面，旧服务器还在。
+#   · nameserver-policy 是字典，按键合并：同名键被替换，你原来的其它条目保留。
+#   · fake-ip-filter 故意不写：需要时直接追加，千万别加 #!replace（会顶掉原配置那串）。
+# ==============================================================================
+name: DNS 分流
+desc: 国内 / 苹果走阿里 DoH，境外走 CF/Google 并经代理（follow-rule）
+
+dns:
+  # bootstrap：只能写纯 IP，用于解析下面这些 DoH 的主机名
+  default-nameserver:
+    - 223.5.5.5
+
+  # 解析代理服务器域名，独立链路、不跟随规则（Stash 3.6+）
+  proxy-server-nameserver:
+    - https://223.5.5.5/dns-query
+
+  # 兜底解析器：境外 DoH。配合 follow-rule 时经代理出去
+  nameserver: #!replace
+    - https://1.1.1.1/dns-query
+    - https://8.8.8.8/dns-query
+
+  # 按域名分流：苹果与国内域名固定国内 DoH
+  # （别在这里写明文 IP 当主：并发查询时明文更快、每次都赢，等于实际走明文）
+  nameserver-policy:
+    'geosite:apple':
+      - https://223.5.5.5/dns-query
+    '+.icloud.com':
+      - https://223.5.5.5/dns-query
+    'geosite:cn':
+      - https://223.5.5.5/dns-query
+
+  # 防泄漏核心：DNS 查询按代理规则转发（等价 mihomo 的 respect-rules）
+  # 前提：DNS 服务器写成 IP、或代理地址是 IP、或配了 proxy-server-nameserver —— 本文件三条都满足
+  follow-rule: true
+
+  # fake-ip 例外域名（可选）：要加就取消注释，只追加、不要 #!replace
+  # fake-ip-filter:
+  #   - '+.example.com'
