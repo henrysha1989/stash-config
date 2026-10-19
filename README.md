@@ -14,7 +14,8 @@ iOS / iPadOS / macOS 端 **Stash**（[stash.wiki](https://stash.wiki/)）的分�
 |---|---|
 | `config.yaml` | 主配置：DNS（fake-ip + follow-rule）+ 4 个策略组 + 42 条分流规则 + 7 个远程规则集 |
 | `dns.stoverride` | 只改 DNS 的覆写文件，叠加在**任意**配置上（不碰规则、策略组、节点） |
-| `rules.stoverride` | 只换规则的覆写文件：4 个策略组 + 7 个规则集 + 42 条规则，`rules` 整体替换 |
+| `rules.stoverride` | 只换规则的覆写文件：4 个策略组 + 7 个规则集 + 42 条规则，`rules`/`proxy-groups` 整体替换 |
+| `momo.stoverride` / `tantan.stoverride` / `soul.stoverride` | 路径级去广告（MitM + URL 改写），按 App 分文件 |
 
 ## 导入
 
@@ -89,6 +90,32 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
 策略组名统一带 `ST-` 前缀（`ST-节点选择` / `ST-手动选择` / `ST-自动选择` / `ST-国内直连`）。
 原因：机场模板常用「节点选择 / 手动选择 / 自动选择 / 国内直连」，撞名会直接报
 `stash core config parse failed: duplicate proxy name: 手动选择`。要换前缀就同时改组定义和 rules 里的引用。
+
+## 路径级去广告（可选，需要 MitM）
+
+域名级规则拦不住「广告接口和主 API 同域」的情况，只能按路径改写。这三份是给 Stash 的 MitM 用的：
+
+| 文件 | 目标 App | MitM 域名 | 预期 |
+|---|---|---|---|
+| `momo.stoverride` | 陌陌 | `api.immomo.com` `api-vip.immomo.com` | 开屏/横幅减少（信息流广告不在此列） |
+| `tantan.stoverride` | 探探 | `core.tantanapp.com` | **可能无效**：策略与素材本地有缓存，第三方 SDK 会补位 |
+| `soul.stoverride` | Soul | `ssp.soulapp.cn` | **通常冗余**：`SoulAd` 表已整域拦掉 |
+
+### 为什么没有并进域名表
+
+- **陌陌 / 探探**：广告接口挂在主 API 上，整域 REJECT 会连带打断主功能
+  （lite 表曾把 `+.api.immomo.com` 当广告域收掉，陌陌持续「网络异常」，2026-10-19 已回滚）。
+- **Soul**：`ssp.soulapp.cn` / `soul-ad.soulapp.cn` 等已在 `soul-ad.list` 里整域拦，
+  路径级没有增量 —— 装了 `rules.stoverride` 就不用装 `soul.stoverride`。
+
+### 使用前提
+
+1. 必须在 Stash 里**开启 MitM 并安装、信任 CA 证书**，否则改写不生效；
+2. 对证书做 pinning 的 App 会表现为**连不上**，不是「没效果」；
+3. MitM 会解密这些域名的**全部**流量（陌陌/探探的主 API 含私聊与位置），是真实的隐私成本；
+4. 路径写错会直接坏主功能 —— 出问题先禁用对应覆写。
+
+参考实现：<https://clashios.app/stoverride>（第三方集合，结构相同的 `.stoverride`）。
 
 ## 与 clash-for-ios-config 的差异
 
