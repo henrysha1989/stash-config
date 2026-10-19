@@ -4,38 +4,38 @@
 #  适用：当前用的配置是机场订阅（自带规则 / 策略组），只想换成本仓库这套分流。
 #  不适用：已经在用本仓库的 config.yaml —— 那份里已经有同样内容，再叠会重复。
 #
-#  ⚠️ 三个前提
+#  ⚠️ 前提
 #   1) rules 带 #!replace：整体替换机场规则。不加的话本文件的规则只会插到最前面，
 #      末尾的 MATCH 会让后面的机场规则全部变成死代码。
-#   2) proxy-groups 默认插到机场原有组的前面。若机场已有同名组
-#      （节点选择 / 手动选择 / 自动选择 / 国内直连），把本文件的组名和 rules 里的引用
-#      一起改名（例如加前缀 MY-）再启用。
+#   2) 策略组名统一带 `ST-` 前缀：机场模板常用「节点选择 / 手动选择 / 自动选择 / 国内直连」，
+#      与本文件撞名会直接报 `stash core config parse failed: duplicate proxy name`。
+#      想换前缀就把这里的组名和 rules 里的引用一起改（一个词改两处：组定义 + 引用）。
 #   3) 各组的 include-all 会收机场配置里的 proxies / proxy-providers，节点不用另配。
 # ==============================================================================
 name: 规则与自建表
-desc: 分流规则 + 广告/直连自建表 + 4 个策略组，覆盖机场自带规则
+desc: 分流规则 + 广告/直连自建表 + 4 个策略组，覆盖机场自带规则（组名带 ST- 前缀）
 
 # ------------------------------------------------------------------------------
-# 4. 策略组（只在「手动选择 / 自动选择」上用 include-all）
+# 4. 策略组（只在「ST-手动选择 / ST-自动选择」上用 include-all）
 # ------------------------------------------------------------------------------
 proxy-groups:
-  - name: 节点选择
+  - name: ST-节点选择
     type: select
     proxies:
-      - 自动选择
-      - 手动选择
+      - ST-自动选择
+      - ST-手动选择
       - DIRECT
 
-  - name: 手动选择
+  - name: ST-手动选择
     type: select
     include-all: true
     # 机场会把「剩余流量 / 套餐到期 / 距离下次重置」这类公告塞成假节点，
-    # 它们测速也能"通过"，一旦被自动选择选中就是废出口（只返回一个说明页）。
+    # 它们测速也能"通过"，一旦被ST-自动选择选中就是废出口（只返回一个说明页）。
     # ⚠️ Stash 文档只列了 filter，没列 exclude-filter。若 App 里仍看到这些公告节点，
     #    说明该键被忽略 —— 到「节点来源」里把公告节点关掉即可。
     exclude-filter: '(?i)(剩余|到期|重置|官网|订阅|流量|距离|套餐|过期|expire|traffic|website|通知)'
 
-  - name: 自动选择
+  - name: ST-自动选择
     type: url-test
     include-all: true
     exclude-filter: '(?i)(剩余|到期|重置|官网|订阅|流量|距离|套餐|过期|expire|traffic|website|通知)'
@@ -43,11 +43,11 @@ proxy-groups:
     interval: 600
     lazy: true
 
-  - name: 国内直连
+  - name: ST-国内直连
     type: select
     proxies:
       - DIRECT
-      - 节点选择
+      - ST-节点选择
 
 # ------------------------------------------------------------------------------
 # 5. 远程规则集
@@ -121,25 +121,25 @@ rules: #!replace
   - DOMAIN-KEYWORD,turn,REJECT
 
   # ===== 3. 内网、本机与自建服务直连 =====
-  - GEOSITE,private,国内直连
-  - GEOIP,LAN,国内直连,no-resolve
-  - IP-CIDR,192.168.0.0/16,国内直连,no-resolve
-  - IP-CIDR,10.0.0.0/8,国内直连,no-resolve
-  - IP-CIDR,172.16.0.0/12,国内直连,no-resolve
-  - IP-CIDR,127.0.0.0/8,国内直连,no-resolve
-  - DOMAIN-SUFFIX,521989.xyz,国内直连      # 【个人定制区】
+  - GEOSITE,private,ST-国内直连
+  - GEOIP,LAN,ST-国内直连,no-resolve
+  - IP-CIDR,192.168.0.0/16,ST-国内直连,no-resolve
+  - IP-CIDR,10.0.0.0/8,ST-国内直连,no-resolve
+  - IP-CIDR,172.16.0.0/12,ST-国内直连,no-resolve
+  - IP-CIDR,127.0.0.0/8,ST-国内直连,no-resolve
+  - DOMAIN-SUFFIX,521989.xyz,ST-国内直连      # 【个人定制区】
 
   # ===== 4. 国内专项直连 =====
-  - RULE-SET,Tesla,国内直连
-  - GEOSITE,apple,国内直连
-  - DOMAIN-SUFFIX,apple.com,国内直连        # geosite 分类漏网时兜底（含 itunes 等子域）
-  - DOMAIN-SUFFIX,icloud.com,国内直连
-  - GEOSITE,dingtalk,国内直连
-  - DOMAIN-SUFFIX,dingtalk.com,国内直连
-  - DOMAIN-SUFFIX,dingtalkapps.com,国内直连
-  - DOMAIN-SUFFIX,laiwang.com,国内直连
+  - RULE-SET,Tesla,ST-国内直连
+  - GEOSITE,apple,ST-国内直连
+  - DOMAIN-SUFFIX,apple.com,ST-国内直连        # geosite 分类漏网时兜底（含 itunes 等子域）
+  - DOMAIN-SUFFIX,icloud.com,ST-国内直连
+  - GEOSITE,dingtalk,ST-国内直连
+  - DOMAIN-SUFFIX,dingtalk.com,ST-国内直连
+  - DOMAIN-SUFFIX,dingtalkapps.com,ST-国内直连
+  - DOMAIN-SUFFIX,laiwang.com,ST-国内直连
   # 公司核心业务系统（megarobo.*）与实测需直连的域，统一走自建直连表
-  - RULE-SET,DirectCustom,国内直连
+  - RULE-SET,DirectCustom,ST-国内直连
 
   # ===== 5. 广告拦截 =====
   # ⚠️ 必须排在 GEOSITE,CN / GEOIP,CN 之前，否则 CN 广告域会被国内兜底放走；
@@ -153,11 +153,11 @@ rules: #!replace
   # ===== 6. 国内娱乐分类直连 =====
   # 它是「国内娱乐」大杂烩分类，含大量字节系域名；必须放在广告表之后，
   # 否则广告表对它们失效（2026-10-17 实测：红果 189 个放行主机是被它抢先）。
-  - GEOSITE,category-entertainment-cn,国内直连
+  - GEOSITE,category-entertainment-cn,ST-国内直连
 
   # ===== 7. 泄漏测试工具走代理 =====
-  - DOMAIN-KEYWORD,browserleaks,节点选择
-  - DOMAIN-KEYWORD,ipleak,节点选择
+  - DOMAIN-KEYWORD,browserleaks,ST-节点选择
+  - DOMAIN-KEYWORD,ipleak,ST-节点选择
 
   # ===== 7b. 强切 TCP（QUIC / UDP-443）=====
   # 掐掉 QUIC 逼客户端回落 TCP：机场节点的 UDP 中继普遍不如 TCP 稳。
@@ -166,23 +166,23 @@ rules: #!replace
   - AND,((DST-PORT,443),(NETWORK,UDP)),REJECT
 
   # ===== 8. 海外专项 =====
-  - GEOSITE,youtube,节点选择
-  - GEOSITE,google,节点选择
-  - GEOSITE,telegram,节点选择
-  - GEOSITE,twitter,节点选择
-  - GEOSITE,facebook,节点选择
-  - GEOSITE,github,节点选择
-  - DOMAIN-SUFFIX,proton.me,节点选择
-  - DOMAIN-SUFFIX,protonmail.com,节点选择
-  - DOMAIN-SUFFIX,pinterest.com,节点选择
+  - GEOSITE,youtube,ST-节点选择
+  - GEOSITE,google,ST-节点选择
+  - GEOSITE,telegram,ST-节点选择
+  - GEOSITE,twitter,ST-节点选择
+  - GEOSITE,facebook,ST-节点选择
+  - GEOSITE,github,ST-节点选择
+  - DOMAIN-SUFFIX,proton.me,ST-节点选择
+  - DOMAIN-SUFFIX,protonmail.com,ST-节点选择
+  - DOMAIN-SUFFIX,pinterest.com,ST-节点选择
 
   # Telegram DC 网段：防纯域名解析被直连拖到转圈
-  - IP-CIDR,91.108.0.0/18,节点选择,no-resolve
-  - IP-CIDR,149.154.160.0/20,节点选择,no-resolve
+  - IP-CIDR,91.108.0.0/18,ST-节点选择,no-resolve
+  - IP-CIDR,149.154.160.0/20,ST-节点选择,no-resolve
 
   # ===== 9. 国内兜底 =====
-  - GEOSITE,CN,国内直连
-  - GEOIP,CN,国内直连,no-resolve
+  - GEOSITE,CN,ST-国内直连
+  - GEOIP,CN,ST-国内直连,no-resolve
 
   # ===== 10. 未命中流量兜底 =====
-  - MATCH,节点选择
+  - MATCH,ST-节点选择
