@@ -1,0 +1,281 @@
+# ==============================================================================
+#  Stash 配置 —— iOS / iPadOS / macOS（Stash App · 自研内核 · 系统级隧道）
+# ------------------------------------------------------------------------------
+#  仓库：          https://github.com/henrysha1989/stash-config
+#  mihomo 同源版： https://github.com/henrysha1989/clash-for-ios-config
+#  ⚠️ 公开仓库：本文件不含任何节点、订阅地址或凭据 —— 请勿往里填。
+# ------------------------------------------------------------------------------
+#  使用说明
+#   1) 节点**不用写进本文件**：在 Stash 的「代理 / 节点来源」里单独加订阅或单节点。
+#      策略组全部 include-all，加节点、换订阅都不用改这里。
+#   2) 没挂节点也能启动：Stash 文档写明「不包含任何代理的策略组会被当作 DIRECT 处理」，
+#      所以先挂好节点再开开关，避免"以为在代理其实在裸奔"。
+#   3) 标了【个人定制区】的段落（自建加速域名 / 公司域名）换环境时整段删掉即可。
+# ------------------------------------------------------------------------------
+#  与 clash-for-ios-config 的差异（只列会改变行为的）
+#   · dns.respect-rules  →  dns.follow-rule          （Stash 没有 respect-rules 这个键）
+#   · dns.direct-nameserver  →  删除                   （Stash 无此键；直连解析由 nameserver-policy 覆盖）
+#   · tun / profile / sniffer / geox-url / unified-delay / tcp-concurrent /
+#     find-process-mode / mixed-port / allow-lan  →  全部删除（iOS 由 App 接管或 Stash 不认）
+#   · GEOSITE,apple@cn  →  GEOSITE,apple             （geosite 属性语法未见于 Stash 文档）
+#   · 规则集 path 仍在 ./rules/ 下，Stash 会把它限制在自己的资源目录内
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. 基础运行设置
+# ------------------------------------------------------------------------------
+mode: rule
+log-level: warning
+# IPv6 开着：关掉会让部分 App 的 AAAA 查询绕过隧道走物理链路（实测会看到运营商解析器）。
+ipv6: true
+
+# ------------------------------------------------------------------------------
+# 2. DNS（fake-ip + 按域名分流；防泄漏、防 Apple 断流）
+# ------------------------------------------------------------------------------
+dns:
+  # 只能写纯 IP：用于 bootstrap 下面这些 DoH 地址
+  default-nameserver:
+    - 223.5.5.5
+    # 腾讯侧 IP 形式 DoH 已整组删除（1.12.12.12 在手机移动网络下 connection refused，
+    # 而 mihomo 对 refused 零退避重试 ⇒ 0.86 秒打爆内存。Stash 侧没复现过，但没必要冒险）。
+
+  # 解析代理服务器域名的独立链路，不跟随规则（Stash 3.6+）
+  proxy-server-nameserver:
+    - https://223.5.5.5/dns-query
+
+  # 兜底解析器：境外 DoH，由 follow-rule 经代理出去
+  nameserver:
+    - https://1.1.1.1/dns-query
+    - https://8.8.8.8/dns-query
+
+  nameserver-policy:
+    # 苹果服务与系统推送固定国内 DoH：解析失败会直接表现为证书异常 / 推送延迟
+    'geosite:apple':
+      - https://223.5.5.5/dns-query
+    '+.icloud.com':
+      - https://223.5.5.5/dns-query
+    # 国内域名统一走阿里 DoH（不要混明文 IP：并发查询时明文更快、每次都赢）
+    'geosite:cn':
+      - https://223.5.5.5/dns-query
+
+  # ⚠️ 防泄漏的核心开关。默认 DNS 查询直连出站；打开后按代理规则转发，
+  #    1.1.1.1 / 8.8.8.8 的查询会命中 MATCH → 节点选择，经代理出去。
+  #    开启条件（Stash 文档）：DNS 服务器写成 IP —— 上面全是 IP 形式，满足。
+  #    代价：境外域名 DNS 依赖节点可用；Stash 文档也提示可能影响 CDN 就近调度。
+  follow-rule: true
+
+  # 这些域名不吃 fake-ip，返回真实解析结果
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '+.521989.xyz'           # 【个人定制区】自建加速站 / 仓库域名
+    - '+.lan'
+    - '+.local'
+    - '+.msftconnecttest.com'
+    - '+.msftncsi.com'
+    - 'speedtest.net'
+    # 苹果（+.apple.com 已覆盖 captive.apple.com / push / itunes / ls 子域）
+    - '+.apple.com'
+    - '+.icloud.com'
+    # 微信 / 腾讯生态
+    - '+.weixin.com'
+    - '+.wechat.com'
+    - '+.qq.com'
+    - '+.tencent.com'
+    # 抖音 / 字节跳动
+    - '+.douyin.com'
+    - '+.douyincdn.com'
+    - '+.douyinpic.com'
+    - '+.amemv.com'
+    - '+.snssdk.com'
+    - '+.zijieapi.com'
+    - '+.byteimg.com'
+    - '+.ibytedtos.com'
+    # 钉钉 / 阿里
+    - '+.dingtalk.com'
+    - '+.dingtalkapps.com'
+    - '+.laiwang.com'
+    - '+.alicdn.com'
+    - '+.tbcdn.cn'
+    # 企业自用域名【个人定制区】
+    - '+.megarobo.com'
+    - '+.megarobo.tech'
+    - '+.megarobo.info'
+
+# ------------------------------------------------------------------------------
+# 3. 节点来源 —— 交给 App 管理，本文件保持空
+# ------------------------------------------------------------------------------
+# Stash 的「节点来源」可以挂多个订阅 / 单节点 / 本地节点集，随时开关；
+# 写进文件反而每次换订阅都要改配置。策略组的 include-all 会把挂上来的节点全部收进来。
+proxies: []
+
+# ------------------------------------------------------------------------------
+# 4. 策略组（只在「手动选择 / 自动选择」上用 include-all）
+# ------------------------------------------------------------------------------
+proxy-groups:
+  - name: 节点选择
+    type: select
+    proxies:
+      - 自动选择
+      - 手动选择
+      - DIRECT
+
+  - name: 手动选择
+    type: select
+    include-all: true
+    # 机场会把「剩余流量 / 套餐到期 / 距离下次重置」这类公告塞成假节点，
+    # 它们测速也能"通过"，一旦被自动选择选中就是废出口（只返回一个说明页）。
+    # ⚠️ Stash 文档只列了 filter，没列 exclude-filter。若 App 里仍看到这些公告节点，
+    #    说明该键被忽略 —— 到「节点来源」里把公告节点关掉即可。
+    exclude-filter: '(?i)(剩余|到期|重置|官网|订阅|流量|距离|套餐|过期|expire|traffic|website|通知)'
+
+  - name: 自动选择
+    type: url-test
+    include-all: true
+    exclude-filter: '(?i)(剩余|到期|重置|官网|订阅|流量|距离|套餐|过期|expire|traffic|website|通知)'
+    url: http://www.gstatic.com/generate_204
+    interval: 600
+    lazy: true
+
+  - name: 国内直连
+    type: select
+    proxies:
+      - DIRECT
+      - 节点选择
+
+# ------------------------------------------------------------------------------
+# 5. 远程规则集
+#    · 公开大表用 MRS（Stash 支持 behavior: domain / ipcidr 的 MRS）
+#    · 自建小表用 classical text（混合类型，MRS 装不下）
+#    · 全部走【个人定制区】的加速前缀，换环境改前缀或换回 raw.githubusercontent.com
+# ------------------------------------------------------------------------------
+rule-providers:
+  BlockHttpDNS:
+    behavior: domain
+    format: mrs
+    interval: 86400
+    url: https://git.521989.xyz/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/httpdns.mrs
+    path: ./rules/httpdns.mrs
+
+  # 217heidai/adblockfilters 的 mihomo 精简表（上游每 8h 重建）
+  AdBlockMihomoLite:
+    behavior: domain
+    format: mrs
+    interval: 28800
+    url: https://git.521989.xyz/https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockmihomolite.mrs
+    path: ./rules/adblockmihomolite.mrs
+
+  Tesla:
+    behavior: domain
+    format: mrs
+    interval: 86400
+    url: https://git.521989.xyz/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/tesla.mrs
+    path: ./rules/tesla.mrs
+
+  # ---- 自建拦截表（shadowrocket-adr-rules 的 clash-ios 分支，已去掉策略列）----
+  ByteDanceAd:
+    behavior: classical
+    format: text
+    interval: 86400
+    url: "https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/shadowrocket-adr-rules/clash-ios/mihomo/bytedance-ad.list"
+    path: ./rules/bytedance-ad.list
+
+  SoulAd:
+    behavior: classical
+    format: text
+    interval: 86400
+    url: "https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/shadowrocket-adr-rules/clash-ios/mihomo/soul-ad.list"
+    path: ./rules/soul-ad.list
+
+  RejectCustom:
+    behavior: classical
+    format: text
+    interval: 86400
+    url: "https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/shadowrocket-adr-rules/clash-ios/mihomo/reject-custom.list"
+    path: ./rules/reject-custom.list
+
+  # ---- 自建直连表（同源）----
+  DirectCustom:
+    behavior: classical
+    format: text
+    interval: 86400
+    url: "https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/shadowrocket-adr-rules/clash-ios/mihomo/direct-custom.list"
+    path: ./rules/direct-custom.list
+
+# ------------------------------------------------------------------------------
+# 6. 分流规则（命中即停，顺序 = 优先级）
+# ------------------------------------------------------------------------------
+rules:
+  # ===== 1. HttpDNS 拦截 =====
+  - RULE-SET,BlockHttpDNS,REJECT
+
+  # ===== 2. WebRTC 穿透截断（按域名，不按端口）=====
+  # 按端口拦不看域名会误伤国内 P2P 语音（微信 / QQ、字节视频通话都走 3478）。
+  - DOMAIN-KEYWORD,stun,REJECT
+  - DOMAIN-KEYWORD,turn,REJECT
+
+  # ===== 3. 内网、本机与自建服务直连 =====
+  - GEOSITE,private,国内直连
+  - GEOIP,LAN,国内直连,no-resolve
+  - IP-CIDR,192.168.0.0/16,国内直连,no-resolve
+  - IP-CIDR,10.0.0.0/8,国内直连,no-resolve
+  - IP-CIDR,172.16.0.0/12,国内直连,no-resolve
+  - IP-CIDR,127.0.0.0/8,国内直连,no-resolve
+  - DOMAIN-SUFFIX,521989.xyz,国内直连      # 【个人定制区】
+
+  # ===== 4. 国内专项直连 =====
+  - RULE-SET,Tesla,国内直连
+  - GEOSITE,apple,国内直连
+  - DOMAIN-SUFFIX,apple.com,国内直连        # geosite 分类漏网时兜底（含 itunes 等子域）
+  - DOMAIN-SUFFIX,icloud.com,国内直连
+  - GEOSITE,dingtalk,国内直连
+  - DOMAIN-SUFFIX,dingtalk.com,国内直连
+  - DOMAIN-SUFFIX,dingtalkapps.com,国内直连
+  - DOMAIN-SUFFIX,laiwang.com,国内直连
+  # 公司核心业务系统（megarobo.*）与实测需直连的域，统一走自建直连表
+  - RULE-SET,DirectCustom,国内直连
+
+  # ===== 5. 广告拦截 =====
+  # ⚠️ 必须排在 GEOSITE,CN / GEOIP,CN 之前，否则 CN 广告域会被国内兜底放走；
+  #    同时又排在 DirectCustom 之后，避免误拦自家域 / 公司系统。
+  # 动作用 REJECT：要静默丢包可改成 REJECT-DROP（Stash 支持这两个内置策略）。
+  - RULE-SET,AdBlockMihomoLite,REJECT
+  - RULE-SET,ByteDanceAd,REJECT
+  - RULE-SET,SoulAd,REJECT
+  - RULE-SET,RejectCustom,REJECT
+
+  # ===== 6. 国内娱乐分类直连 =====
+  # 它是「国内娱乐」大杂烩分类，含大量字节系域名；必须放在广告表之后，
+  # 否则广告表对它们失效（2026-10-17 实测：红果 189 个放行主机是被它抢先）。
+  - GEOSITE,category-entertainment-cn,国内直连
+
+  # ===== 7. 泄漏测试工具走代理 =====
+  - DOMAIN-KEYWORD,browserleaks,节点选择
+  - DOMAIN-KEYWORD,ipleak,节点选择
+
+  # ===== 7b. 强切 TCP（QUIC / UDP-443）=====
+  # 掐掉 QUIC 逼客户端回落 TCP：机场节点的 UDP 中继普遍不如 TCP 稳。
+  # 国内目标豁免必须在前、且用 IP 判据（钉钉自己走 DoH，域名还原不出来）。
+  - AND,((NETWORK,UDP),(DST-PORT,443),(GEOIP,CN)),DIRECT
+  - AND,((DST-PORT,443),(NETWORK,UDP)),REJECT
+
+  # ===== 8. 海外专项 =====
+  - GEOSITE,youtube,节点选择
+  - GEOSITE,google,节点选择
+  - GEOSITE,telegram,节点选择
+  - GEOSITE,twitter,节点选择
+  - GEOSITE,facebook,节点选择
+  - GEOSITE,github,节点选择
+  - DOMAIN-SUFFIX,proton.me,节点选择
+  - DOMAIN-SUFFIX,protonmail.com,节点选择
+  - DOMAIN-SUFFIX,pinterest.com,节点选择
+
+  # Telegram DC 网段：防纯域名解析被直连拖到转圈
+  - IP-CIDR,91.108.0.0/18,节点选择,no-resolve
+  - IP-CIDR,149.154.160.0/20,节点选择,no-resolve
+
+  # ===== 9. 国内兜底 =====
+  - GEOSITE,CN,国内直连
+  - GEOIP,CN,国内直连,no-resolve
+
+  # ===== 10. 未命中流量兜底 =====
+  - MATCH,节点选择
