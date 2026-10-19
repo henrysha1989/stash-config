@@ -1,0 +1,33 @@
+# ==============================================================================
+#  探探去广告（路径级 / MitM）
+# ------------------------------------------------------------------------------
+#  抓包依据（2026-10-19，core.tantanapp.com 实测出现过的广告路径）：
+#    /v2/ad/configuration         开屏策略（coldStart / hotStart 竞价）
+#    /v2/ad-data                  广告数据
+#    /v2/ad/material/*            素材清单（userRecord / guideInfo …）
+#    /v2/ad/aaid                  广告标识
+#    /v2/monetization/strategy/configuration
+#    /v2/monetization-promotions
+#    /v2/users/{id}/advert/tantan-advert/query
+#
+#  ⚠️ 效果预期：**可能仍会弹**
+#   ProxyPin 的 POC 结论是：拦掉这些路径后开屏广告仍在 —— 策略与素材在本地有缓存，
+#   而且 GDT / 穿山甲等第三方 SDK 会立刻补位（那些域名我们的规则集已经拦了）。
+#   想验证的话：装完这个覆写 → 冷启动一次 → 若仍弹，卸载重装探探清缓存再看。
+#
+#  ⚠️ 同样有三条代价：MitM 解密主 API 的全部流量、pinning 会直接连不上、路径写错坏主功能。
+# ==============================================================================
+name: 探探去广告（路径级）
+desc: MitM core.tantanapp.com，按路径拦开屏/广告位接口（受本地缓存影响，可能无效）
+
+http:
+  mitm:
+    - core.tantanapp.com
+
+  url-rewrite:
+    # /v2/ad、/v2/ad-data、/v2/ad/material/*、/v2/ad/aaid …
+    # 加 ([/-]|$) 是必须的：否则 /v2/address 之类的路径也会被误伤
+    - ^https?://core\.tantanapp\.com/v2/ad([/-]|$) - reject-dict
+    - ^https?://core\.tantanapp\.com/v2/monetization-promotions - reject-dict
+    - ^https?://core\.tantanapp\.com/v2/monetization/strategy/configuration - reject-dict
+    - ^https?://core\.tantanapp\.com/v2/users/[^/]+/advert/ - reject-dict
