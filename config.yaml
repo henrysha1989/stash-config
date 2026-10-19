@@ -59,7 +59,7 @@ dns:
       - https://223.5.5.5/dns-query
 
   # ⚠️ 防泄漏的核心开关。默认 DNS 查询直连出站；打开后按代理规则转发，
-  #    1.1.1.1 / 8.8.8.8 的查询会命中 MATCH → 节点选择，经代理出去。
+  #    1.1.1.1 / 8.8.8.8 的查询会命中 MATCH → ST-节点选择，经代理出去。
   #    开启条件（Stash 文档）：DNS 服务器写成 IP —— 上面全是 IP 形式，满足。
   #    代价：境外域名 DNS 依赖节点可用；Stash 文档也提示可能影响 CDN 就近调度。
   follow-rule: true
@@ -109,26 +109,26 @@ dns:
 proxies: []
 
 # ------------------------------------------------------------------------------
-# 4. 策略组（只在「手动选择 / 自动选择」上用 include-all）
+# 4. 策略组（只在「ST-手动选择 / ST-自动选择」上用 include-all）
 # ------------------------------------------------------------------------------
 proxy-groups:
-  - name: 节点选择
+  - name: ST-节点选择
     type: select
     proxies:
-      - 自动选择
-      - 手动选择
+      - ST-自动选择
+      - ST-手动选择
       - DIRECT
 
-  - name: 手动选择
+  - name: ST-手动选择
     type: select
     include-all: true
     # 机场会把「剩余流量 / 套餐到期 / 距离下次重置」这类公告塞成假节点，
-    # 它们测速也能"通过"，一旦被自动选择选中就是废出口（只返回一个说明页）。
+    # 它们测速也能"通过"，一旦被ST-自动选择选中就是废出口（只返回一个说明页）。
     # ⚠️ Stash 文档只列了 filter，没列 exclude-filter。若 App 里仍看到这些公告节点，
     #    说明该键被忽略 —— 到「节点来源」里把公告节点关掉即可。
     exclude-filter: '(?i)(剩余|到期|重置|官网|订阅|流量|距离|套餐|过期|expire|traffic|website|通知)'
 
-  - name: 自动选择
+  - name: ST-自动选择
     type: url-test
     include-all: true
     exclude-filter: '(?i)(剩余|到期|重置|官网|订阅|流量|距离|套餐|过期|expire|traffic|website|通知)'
@@ -136,11 +136,11 @@ proxy-groups:
     interval: 600
     lazy: true
 
-  - name: 国内直连
+  - name: ST-国内直连
     type: select
     proxies:
       - DIRECT
-      - 节点选择
+      - ST-节点选择
 
 # ------------------------------------------------------------------------------
 # 5. 远程规则集
@@ -214,25 +214,25 @@ rules:
   - DOMAIN-KEYWORD,turn,REJECT
 
   # ===== 3. 内网、本机与自建服务直连 =====
-  - GEOSITE,private,国内直连
-  - GEOIP,LAN,国内直连,no-resolve
-  - IP-CIDR,192.168.0.0/16,国内直连,no-resolve
-  - IP-CIDR,10.0.0.0/8,国内直连,no-resolve
-  - IP-CIDR,172.16.0.0/12,国内直连,no-resolve
-  - IP-CIDR,127.0.0.0/8,国内直连,no-resolve
-  - DOMAIN-SUFFIX,521989.xyz,国内直连      # 【个人定制区】
+  - GEOSITE,private,ST-国内直连
+  - GEOIP,LAN,ST-国内直连,no-resolve
+  - IP-CIDR,192.168.0.0/16,ST-国内直连,no-resolve
+  - IP-CIDR,10.0.0.0/8,ST-国内直连,no-resolve
+  - IP-CIDR,172.16.0.0/12,ST-国内直连,no-resolve
+  - IP-CIDR,127.0.0.0/8,ST-国内直连,no-resolve
+  - DOMAIN-SUFFIX,521989.xyz,ST-国内直连      # 【个人定制区】
 
   # ===== 4. 国内专项直连 =====
-  - RULE-SET,Tesla,国内直连
-  - GEOSITE,apple,国内直连
-  - DOMAIN-SUFFIX,apple.com,国内直连        # geosite 分类漏网时兜底（含 itunes 等子域）
-  - DOMAIN-SUFFIX,icloud.com,国内直连
-  - GEOSITE,dingtalk,国内直连
-  - DOMAIN-SUFFIX,dingtalk.com,国内直连
-  - DOMAIN-SUFFIX,dingtalkapps.com,国内直连
-  - DOMAIN-SUFFIX,laiwang.com,国内直连
+  - RULE-SET,Tesla,ST-国内直连
+  - GEOSITE,apple,ST-国内直连
+  - DOMAIN-SUFFIX,apple.com,ST-国内直连        # geosite 分类漏网时兜底（含 itunes 等子域）
+  - DOMAIN-SUFFIX,icloud.com,ST-国内直连
+  - GEOSITE,dingtalk,ST-国内直连
+  - DOMAIN-SUFFIX,dingtalk.com,ST-国内直连
+  - DOMAIN-SUFFIX,dingtalkapps.com,ST-国内直连
+  - DOMAIN-SUFFIX,laiwang.com,ST-国内直连
   # 公司核心业务系统（megarobo.*）与实测需直连的域，统一走自建直连表
-  - RULE-SET,DirectCustom,国内直连
+  - RULE-SET,DirectCustom,ST-国内直连
 
   # ===== 5. 广告拦截 =====
   # ⚠️ 必须排在 GEOSITE,CN / GEOIP,CN 之前，否则 CN 广告域会被国内兜底放走；
@@ -246,11 +246,11 @@ rules:
   # ===== 6. 国内娱乐分类直连 =====
   # 它是「国内娱乐」大杂烩分类，含大量字节系域名；必须放在广告表之后，
   # 否则广告表对它们失效（2026-10-17 实测：红果 189 个放行主机是被它抢先）。
-  - GEOSITE,category-entertainment-cn,国内直连
+  - GEOSITE,category-entertainment-cn,ST-国内直连
 
   # ===== 7. 泄漏测试工具走代理 =====
-  - DOMAIN-KEYWORD,browserleaks,节点选择
-  - DOMAIN-KEYWORD,ipleak,节点选择
+  - DOMAIN-KEYWORD,browserleaks,ST-节点选择
+  - DOMAIN-KEYWORD,ipleak,ST-节点选择
 
   # ===== 7b. 强切 TCP（QUIC / UDP-443）=====
   # 掐掉 QUIC 逼客户端回落 TCP：机场节点的 UDP 中继普遍不如 TCP 稳。
@@ -259,23 +259,23 @@ rules:
   - AND,((DST-PORT,443),(NETWORK,UDP)),REJECT
 
   # ===== 8. 海外专项 =====
-  - GEOSITE,youtube,节点选择
-  - GEOSITE,google,节点选择
-  - GEOSITE,telegram,节点选择
-  - GEOSITE,twitter,节点选择
-  - GEOSITE,facebook,节点选择
-  - GEOSITE,github,节点选择
-  - DOMAIN-SUFFIX,proton.me,节点选择
-  - DOMAIN-SUFFIX,protonmail.com,节点选择
-  - DOMAIN-SUFFIX,pinterest.com,节点选择
+  - GEOSITE,youtube,ST-节点选择
+  - GEOSITE,google,ST-节点选择
+  - GEOSITE,telegram,ST-节点选择
+  - GEOSITE,twitter,ST-节点选择
+  - GEOSITE,facebook,ST-节点选择
+  - GEOSITE,github,ST-节点选择
+  - DOMAIN-SUFFIX,proton.me,ST-节点选择
+  - DOMAIN-SUFFIX,protonmail.com,ST-节点选择
+  - DOMAIN-SUFFIX,pinterest.com,ST-节点选择
 
   # Telegram DC 网段：防纯域名解析被直连拖到转圈
-  - IP-CIDR,91.108.0.0/18,节点选择,no-resolve
-  - IP-CIDR,149.154.160.0/20,节点选择,no-resolve
+  - IP-CIDR,91.108.0.0/18,ST-节点选择,no-resolve
+  - IP-CIDR,149.154.160.0/20,ST-节点选择,no-resolve
 
   # ===== 9. 国内兜底 =====
-  - GEOSITE,CN,国内直连
-  - GEOIP,CN,国内直连,no-resolve
+  - GEOSITE,CN,ST-国内直连
+  - GEOIP,CN,ST-国内直连,no-resolve
 
   # ===== 10. 未命中流量兜底 =====
-  - MATCH,节点选择
+  - MATCH,ST-节点选择
