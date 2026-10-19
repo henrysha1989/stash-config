@@ -238,6 +238,10 @@ rules:
   # ⚠️ 必须排在 GEOSITE,CN / GEOIP,CN 之前，否则 CN 广告域会被国内兜底放走；
   #    同时又排在 DirectCustom 之后，避免误拦自家域 / 公司系统。
   # 动作用 REJECT：要静默丢包可改成 REJECT-DROP（Stash 支持这两个内置策略）。
+  # 误拦豁免（必须在广告表之前）：lite 表把陌陌主 API 当广告域收了
+  # （+.api.immomo.com），不豁免陌陌会持续「网络异常」。2026-10-19 日志实证、
+  # 2026-10-20 复现。只放行主 API；广告域 adip-api / ad-screen-api 仍被拦。
+  - DOMAIN-SUFFIX,api.immomo.com,ST-国内直连
   - RULE-SET,AdBlockMihomoLite,REJECT
   - RULE-SET,ByteDanceAd,REJECT
   - RULE-SET,SoulAd,REJECT
