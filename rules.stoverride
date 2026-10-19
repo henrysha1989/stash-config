@@ -1,0 +1,188 @@
+# ==============================================================================
+#  规则覆写 —— 分流规则 + 4 张自建表 + 4 个策略组，叠到机场配置上
+# ------------------------------------------------------------------------------
+#  适用：当前用的配置是机场订阅（自带规则 / 策略组），只想换成本仓库这套分流。
+#  不适用：已经在用本仓库的 config.yaml —— 那份里已经有同样内容，再叠会重复。
+#
+#  ⚠️ 三个前提
+#   1) rules 带 #!replace：整体替换机场规则。不加的话本文件的规则只会插到最前面，
+#      末尾的 MATCH 会让后面的机场规则全部变成死代码。
+#   2) proxy-groups 默认插到机场原有组的前面。若机场已有同名组
+#      （节点选择 / 手动选择 / 自动选择 / 国内直连），把本文件的组名和 rules 里的引用
+#      一起改名（例如加前缀 MY-）再启用。
+#   3) 各组的 include-all 会收机场配置里的 proxies / proxy-providers，节点不用另配。
+# ==============================================================================
+name: 规则与自建表
+desc: 分流规则 + 广告/直连自建表 + 4 个策略组，覆盖机场自带规则
+
+# ------------------------------------------------------------------------------
+# 4. 策略组（只在「手动选择 / 自动选择」上用 include-all）
+# ------------------------------------------------------------------------------
+proxy-groups:
+  - name: 节点选择
+    type: select
+    proxies:
+      - 自动选择
+      - 手动选择
+      - DIRECT
+
+  - name: 手动选择
+    type: select
+    include-all: true
+    # 机场会把「剩余流量 / 套餐到期 / 距离下次重置」这类公告塞成假节点，
+    # 它们测速也能"通过"，一旦被自动选择选中就是废出口（只返回一个说明页）。
+    # ⚠️ Stash 文档只列了 filter，没列 exclude-filter。若 App 里仍看到这些公告节点，
+    #    说明该键被忽略 —— 到「节点来源」里把公告节点关掉即可。
+    exclude-filter: '(?i)(剩余|到期|重置|官网|订阅|流量|距离|套餐|过期|expire|traffic|website|通知)'
+
+  - name: 自动选择
+    type: url-test
+    include-all: true
+    exclude-filter: '(?i)(剩余|到期|重置|官网|订阅|流量|距离|套餐|过期|expire|traffic|website|通知)'
+    url: http://www.gstatic.com/generate_204
+    interval: 600
+    lazy: true
+
+  - name: 国内直连
+    type: select
+    proxies:
+      - DIRECT
+      - 节点选择
+
+# ------------------------------------------------------------------------------
+# 5. 远程规则集
+#    · 公开大表用 MRS（Stash 支持 behavior: domain / ipcidr 的 MRS）
+#    · 自建小表用 classical text（混合类型，MRS 装不下）
+#    · 全部走【个人定制区】的加速前缀，换环境改前缀或换回 raw.githubusercontent.com
+# ------------------------------------------------------------------------------
+rule-providers:
+  BlockHttpDNS:
+    behavior: domain
+    format: mrs
+    interval: 86400
+    url: https://git.521989.xyz/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/httpdns.mrs
+    path: ./rules/httpdns.mrs
+
+  # 217heidai/adblockfilters 的 mihomo 精简表（上游每 8h 重建）
+  AdBlockMihomoLite:
+    behavior: domain
+    format: mrs
+    interval: 28800
+    url: https://git.521989.xyz/https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockmihomolite.mrs
+    path: ./rules/adblockmihomolite.mrs
+
+  Tesla:
+    behavior: domain
+    format: mrs
+    interval: 86400
+    url: https://git.521989.xyz/https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/tesla.mrs
+    path: ./rules/tesla.mrs
+
+  # ---- 自建拦截表（shadowrocket-adr-rules 的 clash-ios 分支，已去掉策略列）----
+  ByteDanceAd:
+    behavior: classical
+    format: text
+    interval: 86400
+    url: "https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/shadowrocket-adr-rules/clash-ios/mihomo/bytedance-ad.list"
+    path: ./rules/bytedance-ad.list
+
+  SoulAd:
+    behavior: classical
+    format: text
+    interval: 86400
+    url: "https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/shadowrocket-adr-rules/clash-ios/mihomo/soul-ad.list"
+    path: ./rules/soul-ad.list
+
+  RejectCustom:
+    behavior: classical
+    format: text
+    interval: 86400
+    url: "https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/shadowrocket-adr-rules/clash-ios/mihomo/reject-custom.list"
+    path: ./rules/reject-custom.list
+
+  # ---- 自建直连表（同源）----
+  DirectCustom:
+    behavior: classical
+    format: text
+    interval: 86400
+    url: "https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/shadowrocket-adr-rules/clash-ios/mihomo/direct-custom.list"
+    path: ./rules/direct-custom.list
+
+# ------------------------------------------------------------------------------
+# 6. 分流规则（命中即停，顺序 = 优先级）
+# ------------------------------------------------------------------------------
+rules: #!replace
+  # ===== 1. HttpDNS 拦截 =====
+  - RULE-SET,BlockHttpDNS,REJECT
+
+  # ===== 2. WebRTC 穿透截断（按域名，不按端口）=====
+  # 按端口拦不看域名会误伤国内 P2P 语音（微信 / QQ、字节视频通话都走 3478）。
+  - DOMAIN-KEYWORD,stun,REJECT
+  - DOMAIN-KEYWORD,turn,REJECT
+
+  # ===== 3. 内网、本机与自建服务直连 =====
+  - GEOSITE,private,国内直连
+  - GEOIP,LAN,国内直连,no-resolve
+  - IP-CIDR,192.168.0.0/16,国内直连,no-resolve
+  - IP-CIDR,10.0.0.0/8,国内直连,no-resolve
+  - IP-CIDR,172.16.0.0/12,国内直连,no-resolve
+  - IP-CIDR,127.0.0.0/8,国内直连,no-resolve
+  - DOMAIN-SUFFIX,521989.xyz,国内直连      # 【个人定制区】
+
+  # ===== 4. 国内专项直连 =====
+  - RULE-SET,Tesla,国内直连
+  - GEOSITE,apple,国内直连
+  - DOMAIN-SUFFIX,apple.com,国内直连        # geosite 分类漏网时兜底（含 itunes 等子域）
+  - DOMAIN-SUFFIX,icloud.com,国内直连
+  - GEOSITE,dingtalk,国内直连
+  - DOMAIN-SUFFIX,dingtalk.com,国内直连
+  - DOMAIN-SUFFIX,dingtalkapps.com,国内直连
+  - DOMAIN-SUFFIX,laiwang.com,国内直连
+  # 公司核心业务系统（megarobo.*）与实测需直连的域，统一走自建直连表
+  - RULE-SET,DirectCustom,国内直连
+
+  # ===== 5. 广告拦截 =====
+  # ⚠️ 必须排在 GEOSITE,CN / GEOIP,CN 之前，否则 CN 广告域会被国内兜底放走；
+  #    同时又排在 DirectCustom 之后，避免误拦自家域 / 公司系统。
+  # 动作用 REJECT：要静默丢包可改成 REJECT-DROP（Stash 支持这两个内置策略）。
+  - RULE-SET,AdBlockMihomoLite,REJECT
+  - RULE-SET,ByteDanceAd,REJECT
+  - RULE-SET,SoulAd,REJECT
+  - RULE-SET,RejectCustom,REJECT
+
+  # ===== 6. 国内娱乐分类直连 =====
+  # 它是「国内娱乐」大杂烩分类，含大量字节系域名；必须放在广告表之后，
+  # 否则广告表对它们失效（2026-10-17 实测：红果 189 个放行主机是被它抢先）。
+  - GEOSITE,category-entertainment-cn,国内直连
+
+  # ===== 7. 泄漏测试工具走代理 =====
+  - DOMAIN-KEYWORD,browserleaks,节点选择
+  - DOMAIN-KEYWORD,ipleak,节点选择
+
+  # ===== 7b. 强切 TCP（QUIC / UDP-443）=====
+  # 掐掉 QUIC 逼客户端回落 TCP：机场节点的 UDP 中继普遍不如 TCP 稳。
+  # 国内目标豁免必须在前、且用 IP 判据（钉钉自己走 DoH，域名还原不出来）。
+  - AND,((NETWORK,UDP),(DST-PORT,443),(GEOIP,CN)),DIRECT
+  - AND,((DST-PORT,443),(NETWORK,UDP)),REJECT
+
+  # ===== 8. 海外专项 =====
+  - GEOSITE,youtube,节点选择
+  - GEOSITE,google,节点选择
+  - GEOSITE,telegram,节点选择
+  - GEOSITE,twitter,节点选择
+  - GEOSITE,facebook,节点选择
+  - GEOSITE,github,节点选择
+  - DOMAIN-SUFFIX,proton.me,节点选择
+  - DOMAIN-SUFFIX,protonmail.com,节点选择
+  - DOMAIN-SUFFIX,pinterest.com,节点选择
+
+  # Telegram DC 网段：防纯域名解析被直连拖到转圈
+  - IP-CIDR,91.108.0.0/18,节点选择,no-resolve
+  - IP-CIDR,149.154.160.0/20,节点选择,no-resolve
+
+  # ===== 9. 国内兜底 =====
+  - GEOSITE,CN,国内直连
+  - GEOIP,CN,国内直连,no-resolve
+
+  # ===== 10. 未命中流量兜底 =====
+  - MATCH,节点选择
