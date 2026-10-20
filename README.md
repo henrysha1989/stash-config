@@ -162,6 +162,22 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
 
 参考实现：<https://clashios.app/stoverride>（第三方集合，结构相同的 `.stoverride`）。
 
+## 调优来源（GitHub 同类项目）
+
+| 项目 | 用到了什么 |
+|---|---|
+| [VirgilClyne/GetSomeFries](https://github.com/VirgilClyne/GetSomeFries) | `stoverride/HTTPDNS.Block` —— **40 条 HTTPDNS 服务器 IP 段**，补上我们域名表拦不到的 IP 直连；`stoverride/DNS` —— 路由器后台域名走 `system` 解析的思路 |
+| [fmz200/wool_scripts](https://github.com/fmz200/wool_scripts) | Soul 广告脚本（已移植）、高德模块 |
+| [Xo776/byead](https://github.com/Xo776/byead) | Soul 广告子域清单 |
+| [blackmatrix7/ios_rule_script](https://github.com/blackmatrix7/ios_rule_script) | Stash 原生 rewrite 模块（Advertising / BlockHTTPDNS 等），思路参考 |
+
+2026-10-20 的两次调优：
+
+1. **HTTPDNS IP 拦截**：`rule-providers` 新增 `HTTPDNSIP`（inline，40 条 IP-CIDR），
+   规则 `RULE-SET,HTTPDNSIP,REJECT,no-resolve`。域名表只能拦域名，App 改用 IP 直连时拦不住 —— 这是补漏。
+2. **局域网 DNS**：`nameserver-policy` 增加 `+.lan` / `+.local` / `+.home.arpa` → `system`。
+   以前这些名字会被送去阿里 DoH，本地 NAS / 路由器的名字解析不了。
+
 ## 与 clash-for-ios-config 的差异
 
 | mihomo 版 | 本仓库 | 原因 |
