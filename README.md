@@ -16,6 +16,8 @@ iOS / iPadOS / macOS 端 **Stash**（[stash.wiki](https://stash.wiki/)）的分�
 | `dns.stoverride` | 只改 DNS 的覆写文件，叠加在**任意**配置上（不碰规则、策略组、节点） |
 | `rules.stoverride` | 只换规则的覆写文件：4 个策略组 + 7 个规则集 + 42 条规则，`rules`/`proxy-groups` 整体替换 |
 | `momo.stoverride` / `tantan.stoverride` / `soul.stoverride` | 路径级去广告（MitM + URL 改写），按 App 分文件 |
+| `amap.stoverride` | 高德路径级去广告（备用，未启用） |
+| `shadowrocket/` | **Shadowrocket 版模块**：`path-ads.module`（上述路径规则的转写）+ 安装说明 |
 
 ## 导入
 
