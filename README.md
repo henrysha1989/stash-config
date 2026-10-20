@@ -99,7 +99,7 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
 |---|---|---|---|
 | `momo.stoverride` | 陌陌 | `api.immomo.com` `api-vip.immomo.com` | 开屏/横幅减少（信息流广告不在此列） |
 | `tantan.stoverride` | 探探 | `core.tantanapp.com` | **实测无效**，见下「已试验但无解」 |
-| `soul.stoverride` | Soul | `ssp.soulapp.cn` | **通常冗余**：`SoulAd` 表已整域拦掉 |
+| `soul.stoverride` | Soul | `ssp.soulapp.cn` | 升级版：补 2026 广告子域、修社区版的规则顺序 bug、放行功能域 |
 
 ### 为什么没有并进域名表
 
@@ -107,6 +107,21 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
   （lite 表曾把 `+.api.immomo.com` 当广告域收掉，陌陌持续「网络异常」，2026-10-19 已回滚）。
 - **Soul**：`ssp.soulapp.cn` / `soul-ad.soulapp.cn` 等已在 `soul-ad.list` 里整域拦，
   路径级没有增量 —— 装了 `rules.stoverride` 就不用装 `soul.stoverride`。
+
+### Soul 覆写的升级来历（2026-10-20）
+
+社区版（clashios.app / lodepuly，2024-07）**有三个问题**，所以做了升级：
+
+1. **规则顺序写反**：`DOMAIN-SUFFIX,soulapp.cn,DIRECT` 排在最前，后面所有 `*.soulapp.cn` 的
+   `REJECT` 全是死规则 —— 广告域实际没被拦。
+2. **脚本源已失效**：`gitlab.com/lodepuly/vpn_tool/.../Soul_remove_ads.js` 现在 302 跳登录页，
+   provider 拉不到脚本（本地有缓存才显得"还能用"）。
+3. **缺 2026 新增广告子域**：`soul-commercial` / `marketing-openapi` / `ad-brand-activity` /
+   `ad-reward-test`。
+
+升级依据 = [Xo776/byead 的 soul_ads.conf v0.7](https://github.com/Xo776/byead)（2026-06-16 仍在维护）
+＋ 2026-10-19 本机抓包。**没搬**的是那套 10 多个 JS 脚本（信息流剔除伪装帖、话题热榜、礼物榜、
+青少年弹窗等），要逐个适配成 `script-providers` 才能用 —— 属于后续可选项。
 
 ### 已试验但无解（2026-10-20，真机四轮验证）
 
