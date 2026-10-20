@@ -120,8 +120,17 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
    `ad-reward-test`。
 
 升级依据 = [Xo776/byead 的 soul_ads.conf v0.7](https://github.com/Xo776/byead)（2026-06-16 仍在维护）
-＋ 2026-10-19 本机抓包。**没搬**的是那套 10 多个 JS 脚本（信息流剔除伪装帖、话题热榜、礼物榜、
-青少年弹窗等），要逐个适配成 `script-providers` 才能用 —— 属于后续可选项。
+＋ 2026-10-19 本机抓包。
+
+**脚本层**：`scripts/soul-ad-clean.js` 移植自 [fmz200/wool_scripts](https://github.com/fmz200/wool_scripts/blob/main/Scripts/soul/soul_ads.js)
+（2024-06，引用 ZenmoFeiShi），裁了三处：
+
+1. 去掉 12 KB 的 `$.Env` 框架，只留逻辑；
+2. **去掉 `/chat/limitInfo` 的 `limit=false`** —— 那是解锁付费能力，不属于去广告；
+3. 去掉原版已注释掉的空分支。
+
+覆盖 11 个接口（话题热榜、礼物榜、青少年弹窗、我的页推广、版本更新提示、星球页推广卡片等）。
+`ssp` 竞价接口仍由 `url-rewrite` 的 `reject-dict` 处理，不走脚本。
 
 ### 已试验但无解（2026-10-20，真机四轮验证）
 
