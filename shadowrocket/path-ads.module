@@ -1,0 +1,92 @@
+#!name=路径级去广告（陌陌 / Soul / 探探 / 高德）
+#!desc=从 Stash 覆写转写的 Shadowrocket 模块：域名拦截 + URL 改写 + 响应脚本。探探受阿里妈妈 amdc 影响可能无效。
+#!author=henrysha1989
+#!homepage=https://github.com/henrysha1989/stash-config
+#!date=2026-10-20
+#!raw-url=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/shadowrocket/path-ads.module
+
+############################################################
+# 来源：本仓库 Stash 版覆写（momo / soul / tantan / amap.stoverride）
+# 差异：Shadowrocket 没有 `#!replace` 那套覆写机制，规则直接合并进模块；
+#       脚本走仓库里的 scripts/*.js（与本仓库 Stash 内联版同源，逻辑一致）。
+############################################################
+
+[Rule]
+
+# ==== Soul 广告子域（必须排在直连规则之前）====
+DOMAIN,ad.soulapp.cn,REJECT
+DOMAIN,ads.soulapp.cn,REJECT
+DOMAIN,ad-r.soulapp.cn,REJECT
+DOMAIN,ad-h5-cdn.soulapp.cn,REJECT
+DOMAIN,ad-h5-station-cdn.soulapp.cn,REJECT
+DOMAIN,ad-static.soulapp.cn,REJECT
+DOMAIN,ad-reward.soulapp.cn,REJECT
+DOMAIN,ad-reward-test.soulapp.cn,REJECT
+DOMAIN,ad-audit-provider.soulapp.cn,REJECT
+DOMAIN,ad-brand-activity.soulapp.cn,REJECT
+DOMAIN,soul-ad.soulapp.cn,REJECT
+DOMAIN,soul-commercial.soulapp.cn,REJECT
+DOMAIN,soul-report.soulapp.cn,REJECT
+DOMAIN,marketing-openapi.soulapp.cn,REJECT
+DOMAIN,ssp.soulapp.cn,REJECT
+DOMAIN,splash.soulapp.cn,REJECT
+
+# ==== 高德地图广告与日志域 ====
+DOMAIN-SUFFIX,adiu.amap.com,REJECT
+DOMAIN,aboard.apilocate.amap.com,REJECT
+DOMAIN,apiinit.amap.com,REJECT
+DOMAIN,icloud-amap.com,REJECT
+DOMAIN,logs.amap.com,REJECT
+DOMAIN-SUFFIX,dualstack-logs.amap.com,REJECT
+DOMAIN-SUFFIX,optimus-ads.amap.com,REJECT
+DOMAIN,optimus-ads.amap.com.w.alikunlun.com,REJECT
+DOMAIN-SUFFIX,page.amap.com,REJECT
+DOMAIN-SUFFIX,shouji.sougou.com,REJECT
+DOMAIN,u51.me,REJECT
+
+[URL Rewrite]
+
+# ==== 陌陌：广告接口挂在主 API 上，只能按路径拦 ====
+^https?://api\.immomo\.com/api/banners - reject-dict
+^https?://api\.immomo\.com/v2/adver/ - reject-dict
+^https?://api-vip\.immomo\.com/ad/ - reject-dict
+
+# ==== 探探：开屏策略与广告位 ====
+^https?://core\.tantanapp\.com/v2/ad-data - reject-dict
+^https?://core\.tantanapp\.com/v2/ad/aaid - reject-dict
+^https?://core\.tantanapp\.com/v2/ad/material/ - reject-dict
+^https?://core\.tantanapp\.com/v2/oms/user/launchPages - reject-dict
+^https?://core\.tantanapp\.com/v2/oms/me/creatives - reject-dict
+^https?://core\.tantanapp\.com/v2/monetization-promotions - reject-dict
+^https?://core\.tantanapp\.com/v2/monetization/strategy/configuration - reject-dict
+^https?://core\.tantanapp\.com/v2/users/[^/]+/advert/ - reject-dict
+
+# ==== Soul：SSP 竞价与广告配置 ====
+^https?://ssp\.soulapp\.cn/api/(q|bidResult|ad/) - reject-dict
+^https?://ssp\.soulapp\.cn/api/materialCacheConfig - reject-dict
+
+# ==== 高德：开屏与推广接口 ====
+^https?://amap-aos-info-nogw\.amap\.com/ws/aos/alimama/splash_screen_rt - reject
+^https?://m5\.amap\.com/ws/valueadded/ - reject
+^https?://m5\.amap\.com/ws/shield/dsp/app/startup/init - reject-dict
+
+[Script]
+
+# ==== 探探：开屏配置改写成空广告位（合法结构，避免 App 回退默认配置）====
+http-response ^https?://core\.tantanapp\.com/v2/ad/configuration script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/tantan-ad-config.js, requires-body=1, max-size=-1, timeout=30
+
+# ==== Soul：广告/推广字段清理（已剔除解锁逻辑）====
+http-response ^https?://api-account\.soulapp\.cn/teenager/config script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://api-a\.soulapp\.cn/v\d/post/gift/list script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://api-a\.soulapp\.cn/official/scene/module script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://api-user\.soulapp\.cn/furion/position/content script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://api-user\.soulapp\.cn/v\d/planet/config script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://post\.soulapp\.cn/hot/soul/rank script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://post\.soulapp\.cn/v\d/post/homepage/guide/card script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://post\.soulapp\.cn/v\d/post/recSquare/subTabs script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://chat-live\.soulapp\.cn/chatroom/chatClassifyRoomList script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://gateway-mobile-gray\.soulapp\.cn/mobile/app/version/queryIos script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+http-response ^https?://47\.110\.187\.87/winterfell/ script-path=https://git.521989.xyz/https://raw.githubusercontent.com/henrysha1989/stash-config/main/scripts/soul-ad-clean.js, requires-body=1, max-size=-1, timeout=30
+
+[MITM]
+hostname = %APPEND% api.immomo.com, api-vip.immomo.com, core.tantanapp.com, ssp.soulapp.cn, api-a.soulapp.cn, api-account.soulapp.cn, api-chat.soulapp.cn, api-user.soulapp.cn, chat-live.soulapp.cn, gateway-mobile-gray.soulapp.cn, post.soulapp.cn, 47.110.187.87, m5.amap.com, m5-zb.amap.com, oss.amap.com, sns.amap.com, amap-aos-info-nogw.amap.com, optimus-ads.amap.com
