@@ -40,6 +40,10 @@ dns:
       - https://223.5.5.5/dns-query
     'geosite:cn':
       - https://223.5.5.5/dns-query
+    # 局域网 / 本地名字交给系统解析器（路由器、mDNS、NAS 域名）
+    '+.lan': system
+    '+.local': system
+    '+.home.arpa': system
 
   # 防泄漏核心：DNS 查询按代理规则转发（等价 mihomo 的 respect-rules）
   # 前提：DNS 服务器写成 IP、或代理地址是 IP、或配了 proxy-server-nameserver —— 本文件三条都满足
