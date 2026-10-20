@@ -1,27 +1,60 @@
 # ==============================================================================
-#  Soul 去广告（路径级 / MitM）—— ⚠️ 与现有域名拦截重复，多数情况下不需要装
+#  Soul 去广告（升级版）
 # ------------------------------------------------------------------------------
-#  为什么说冗余：
-#    Soul 的广告域（ssp.soulapp.cn / soul-ad.soulapp.cn / ad*.soulapp.cn …）
-#    已经整域收在自建表 `soul-ad.list` 里，由 `rules.stoverride` 的 `SoulAd` 规则集拦掉。
-#    整域 REJECT 与「按路径拦」的结果等价，而且更彻底。
+#  基线：社区版 Soul_remove_ads.stoverride（clashios.app / lodepuly，2024-07）
+#  升级来源：
+#   · Xo776/byead 的 soul_ads.conf v0.7（2026-06-16，仍在维护，含误伤说明 COLLATERAL.md）
+#   · 2026-10-19 本机 ProxyPin 抓包（ssp / api-a / post / ad-r 等真实路径）
 #
-#  什么时候才有用：
-#    · 你没用 `rules.stoverride`（没装 SoulAd 那张表）；
-#    · 或者将来 Soul 把广告接口迁到主域（post.soulapp.cn / api-a.soulapp.cn）上 —— 那时才必须按路径拦。
+#  相对社区版修了四处：
+#   1) **规则顺序**：社区版把 `DOMAIN-SUFFIX,soulapp.cn,DIRECT` 排在最前，
+#      后面所有 `*.soulapp.cn` 的 REJECT 全是死规则。本版把 REJECT 放前面、直连放最后。
+#   2) **补 2026 新增广告子域**：soul-commercial / marketing-openapi / ad-brand-activity /
+#      ad-reward-test —— 社区版没有，靠 soul-ad.list 漏掉的那部分。
+#   3) **放行功能域**：increase-openapi.soulapp.cn 是聊天横幅开关（不是广告），
+#      我们的 soul-ad.list 曾整域拦它，本覆写用直连规则把它捞回来。
+#   4) **ssp 路径级兜底**：域名层已整域拦 ssp，这里再加一层 reject-dict，
+#      用于 App 改用 IP 直连绕过域名拦截的场景。
 #
-#  抓包依据（2026-10-19）：ssp.soulapp.cn 上的广告路径有
-#    /api/ad/strategyApi 、/api/ad/clientConfig 、/api/q 、/api/bidResult
-#    （POC 拦掉前两个后，App 立刻转投 /api/q + /api/bidResult 竞价 —— 所以整域拦才是对的）
-#
-#  ⚠️ MitM 代价：解密 ssp.soulapp.cn 全部流量；pinning 会导致连接失败。
+#  ⚠️ 没搬的部分：Xo776 那套有 10 多个 JS 脚本（信息流剔除伪装帖、话题热榜、礼物榜、
+#     青少年弹窗等），要逐个适配成 Stash 的 script-providers 才能用。当前先做域名 + 路径这层，
+#     收益最大的是开屏与广告位，信息流残留属于后续可选项。
 # ==============================================================================
-name: Soul 去广告（路径级，通常冗余）
-desc: MitM ssp.soulapp.cn 按路径拦；若已启用 SoulAd 规则集（整域拦）则无需安装
+name: Soul 去广告（升级版）
+desc: 广告子域 REJECT + 功能域放行 + ssp 路径兜底；基线社区版，补 2026 新增域名
+
+rules:
+  # ---- 广告子域（必须排在下面的 soulapp.cn 直连之前）----
+  - DOMAIN,ad.soulapp.cn,REJECT
+  - DOMAIN,ads.soulapp.cn,REJECT
+  - DOMAIN,ad-r.soulapp.cn,REJECT
+  - DOMAIN,ad-h5-cdn.soulapp.cn,REJECT
+  - DOMAIN,ad-h5-station-cdn.soulapp.cn,REJECT
+  - DOMAIN,ad-static.soulapp.cn,REJECT
+  - DOMAIN,ad-reward.soulapp.cn,REJECT
+  - DOMAIN,ad-reward-test.soulapp.cn,REJECT
+  - DOMAIN,ad-audit-provider.soulapp.cn,REJECT
+  - DOMAIN,ad-brand-activity.soulapp.cn,REJECT
+  - DOMAIN,soul-ad.soulapp.cn,REJECT
+  - DOMAIN,soul-commercial.soulapp.cn,REJECT
+  - DOMAIN,soul-report.soulapp.cn,REJECT
+  - DOMAIN,marketing-openapi.soulapp.cn,REJECT
+  - DOMAIN,ssp.soulapp.cn,REJECT
+  - DOMAIN,splash.soulapp.cn,REJECT
+
+  # ---- 功能域：放行（soul-ad.list 误拦过的）----
+  - DOMAIN-SUFFIX,increase-openapi.soulapp.cn,ST-国内直连
+  - DOMAIN-SUFFIX,gateway2-tcp-spam.soulapp.cn,ST-国内直连
+  - DOMAIN-SUFFIX,handshake.gtnetwork.soulapp.cn,ST-国内直连
+
+  # ---- 其余 Soul 流量直连（最后一条，不能再往后加 REJECT）----
+  - DOMAIN-SUFFIX,soulapp.cn,ST-国内直连
 
 http:
   mitm:
     - ssp.soulapp.cn
 
   url-rewrite:
-    - ^https?://ssp\.soulapp\.cn/api/(ad/|q$|bidResult) - reject-dict
+    # ssp 竞价与广告配置（域名已被 REJECT，这一层给 IP 直连绕过的场景兜底）
+    - ^https?://ssp\.soulapp\.cn/api/(q|bidResult|ad/) - reject-dict
+    - ^https?://ssp\.soulapp\.cn/api/materialCacheConfig - reject-dict
