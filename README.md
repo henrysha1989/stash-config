@@ -93,13 +93,14 @@ curl 'http://<stash-ip>:<port>/diagnosis/dns'   # 逐个测试配置里的 DNS �
 
 ## 路径级去广告（可选，需要 MitM）
 
-域名级规则拦不住「广告接口和主 API 同域」的情况，只能按路径改写。这三份是给 Stash 的 MitM 用的：
+域名级规则拦不住「广告接口和主 API 同域」的情况，只能按路径改写。这几份是给 Stash 的 MitM 用的：
 
 | 文件 | 目标 App | MitM 域名 | 预期 |
 |---|---|---|---|
 | `momo.stoverride` | 陌陌 | `api.immomo.com` `api-vip.immomo.com` | 开屏/横幅减少（信息流广告不在此列） |
 | `tantan.stoverride` | 探探 | `core.tantanapp.com` | **实测无效**，见下「已试验但无解」 |
-| `soul.stoverride` | Soul | `ssp.soulapp.cn` | 升级版：补 2026 广告子域、修社区版的规则顺序 bug、放行功能域 |
+| `soul.stoverride` | Soul | `ssp.soulapp.cn` + 8 个 API 主机 | 升级版：补 2026 广告子域、修社区版的规则顺序 bug、放行功能域；含 11 条脚本 |
+| `amap.stoverride` | 高德地图 | `m5.amap.com` 等 6 个 | **备用，未启用**：开屏与推广接口路径拦截（移植自 fmz200/wool_scripts） |
 
 ### 为什么没有并进域名表
 
