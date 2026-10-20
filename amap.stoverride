@@ -1,0 +1,52 @@
+# ==============================================================================
+#  高德地图去广告（域名 + 路径级）
+# ------------------------------------------------------------------------------
+#  来源：fmz200/wool_scripts — Surge/module/split/partG/AutoNavi.sgmodule
+#        （奶思，2026-10 仍在更新；这里把 Surge 语法翻成 Stash）
+#  对照：clashios.app 的 Amap_remove_ads（lodepuly，2024-08）—— 它的脚本走 gitlab，
+#        现在 302 跳登录，拉不到；只借用了它的 MitM 主机名单。
+#
+#  覆盖：
+#   · 开屏：amap-aos-info-nogw /ws/aos/alimama/splash_screen_rt → reject
+#   · DSP 启动位：m5 /ws/shield/dsp/app/startup/init → reject-dict（回 {}）
+#   · 其余 m5 /ws/valueadded/（推广类接口）→ reject
+#   · 域名层：广告与日志域（adiu / optimus-ads / dualstack-logs / logs 等）REJECT
+#
+#  ⚠️ 风险
+#   · MitM 会解密 m5.amap.com 等主 API；高德对证书不敏感，但不排除版本更新后 pinning
+#   · `page.amap.com` / `u51.me` / `shouji.sougou.com` 是 SDK 侧域名，拦掉不影响导航
+#   · 若出现「路线规划转圈 / 天气不显示」，先禁用本覆写
+# ==============================================================================
+name: 高德地图去广告
+desc: 开屏与推广接口路径级拦截 + 广告域 REJECT（来源 fmz200/wool_scripts）
+
+rules:
+  # 广告 SDK 与日志
+  - DOMAIN-SUFFIX,adiu.amap.com,REJECT
+  - DOMAIN,aboard.apilocate.amap.com,REJECT
+  - DOMAIN,apiinit.amap.com,REJECT
+  - DOMAIN,icloud-amap.com,REJECT
+  - DOMAIN,logs.amap.com,REJECT
+  - DOMAIN-SUFFIX,dualstack-logs.amap.com,REJECT
+  - DOMAIN-SUFFIX,optimus-ads.amap.com,REJECT
+  - DOMAIN,optimus-ads.amap.com.w.alikunlun.com,REJECT
+  - DOMAIN-SUFFIX,page.amap.com,REJECT
+  - DOMAIN-SUFFIX,shouji.sougou.com,REJECT
+  - DOMAIN,u51.me,REJECT
+
+http:
+  mitm:
+    - m5.amap.com
+    - m5-zb.amap.com
+    - oss.amap.com
+    - sns.amap.com
+    - amap-aos-info-nogw.amap.com
+    - optimus-ads.amap.com
+
+  url-rewrite:
+    # 开屏（阿里妈妈位）
+    - ^https?://amap-aos-info-nogw\.amap\.com/ws/aos/alimama/splash_screen_rt - reject
+    # 推广类接口整体拦
+    - ^https?://m5\.amap\.com/ws/valueadded/ - reject
+    # DSP 启动位：回空 JSON，让 App 当成"没有素材"
+    - ^https?://m5\.amap\.com/ws/shield/dsp/app/startup/init - reject-dict
