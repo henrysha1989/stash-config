@@ -136,9 +136,10 @@ proxy-groups:
     type: url-test
     include-all: true
     exclude-filter: '(?i)(剩余|到期|重置|官网|订阅|流量|距离|套餐|过期|expire|traffic|website|通知)'
-    url: http://www.gstatic.com/generate_204
-    interval: 600
-    lazy: true
+    url: http://www.apple.com        # Stash 文档建议用 HTTP 目标；gstatic 在部分网络下会拖慢数值
+    interval: 600                    # 10 分钟一次；太频繁费电
+    tolerance: 100                   # 延迟差 <100ms 不切换，避免节点间来回抖动
+    lazy: true                       # 组没被用到时跳过测速（省电）
 
   - name: ST-国内直连
     type: select
